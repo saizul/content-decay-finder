@@ -1,0 +1,35 @@
+# .github/workflows/content-decay.yml in a site repository: a monthly report from the Search Console API.
+# Store the service account JSON key in the repository secret GSC_SERVICE_ACCOUNT and add the service
+# account's email address as a (restricted) user of the Search Console property.
+name: Content decay report
+
+on:
+  schedule:
+    - cron: "0 6 2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "content-decay-finder[api] @ git+https://github.com/saizul/content-decay-finder"
+      - name: Analyse
+        env:
+          GSC_SERVICE_ACCOUNT: ${{ secrets.GSC_SERVICE_ACCOUNT }}
+        run: |
+          umask 077
+          printf '%s' "$GSC_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          content-decay-finder analyze --site-url "sc-domain:example.com" --credentials "$RUNNER_TEMP/sa.json" \
+            -f markdown -f html -f csv -o report
+          rm -f "$RUNNER_TEMP/sa.json"
+          cat report/content-decay.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: content-decay-report
+          path: report/

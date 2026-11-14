@@ -1,0 +1,22 @@
+# Settings for `content-decay-finder analyze --config content-decay.toml`.
+# Every key is optional; command-line flags override these values.
+
+[analysis]
+recent_weeks = 4            # the window being judged
+baseline_weeks = 8          # the weeks right before it
+trend_weeks = 16            # regression window for the weekly trend
+decline_threshold = 0.20    # a 20% drop after seasonality = decaying
+watch_threshold = 0.10      # a 10% drop = watch
+min_baseline_clicks = 30    # pages with fewer baseline clicks are "low-data"
+seasonality = "auto"        # "auto" (page, then site), "page", "site" or "off"
+section_depth = 1           # /blog/, /services/ ...
+opportunity_min_position = 8
+opportunity_max_position = 20
+opportunity_min_impressions = 100
+top = 50
+ignore = ["/tag/", "/page/\\d+/", "\\?s="]
+
+[analysis.sections]
+# Named sections win over the path depth. Regular expressions are matched against the URL path.
+"Services" = "^/services/"
+"Free tools" = "^/tools/"

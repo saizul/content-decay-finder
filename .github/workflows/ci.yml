@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Test
+        run: pytest
+      - name: CLI smoke test (sample data)
+        run: |
+          content-decay-finder --version
+          content-decay-finder analyze examples/sample-data --config examples/content-decay.toml -f all -o smoke
+          python -c "import json; d = json.load(open('smoke/content-decay.json')); assert d['refresh_priorities'], d"
+          test -s smoke/content-decay.html
+          test -s smoke/content-decay-pages.csv
+          # The sample has two decaying pages, so --fail-on-decay 2 must fail the build (exit code 1).
+          set +e
+          content-decay-finder analyze examples/sample-data --fail-on-decay 2 --quiet
+          code=$?
+          set -e
+          test "$code" -eq 1
+          python examples/library_usage.py
+          # The sample data must be reproducible from its generator.
+          python examples/make_sample_data.py
+          content-decay-finder analyze examples/sample-data --quiet -f json -o smoke2
+          python -c "import json; a = json.load(open('smoke/content-decay.json'))['refresh_priorities']; b = json.load(open('smoke2/content-decay.json'))['refresh_priorities']; assert [p['page'] for p in a] == [p['page'] for p in b]"
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t content-decay-finder:ci .
+      - run: >
+          docker run --rm -v "$PWD/examples:/work:ro" -v "$RUNNER_TEMP:/out" --user "$(id -u)"
+          content-decay-finder:ci analyze sample-data -f html -o /out
+      - run: test -s "$RUNNER_TEMP/content-decay.html"

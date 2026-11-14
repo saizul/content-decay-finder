@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "content-decay-finder"
+dynamic = ["version"]
+description = "Find decaying pages in Google Search Console data: weekly trends, period comparison with year-over-year seasonality, refresh priority, URL sections, cannibalisation and almost-page-1 opportunities, with CSV/JSON/Markdown/HTML reports."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Saizul Amin" }]
+keywords = ["seo", "google-search-console", "content-decay", "search-analytics", "content-audit", "cannibalization"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Typing :: Typed",
+]
+dependencies = ["tomli>=2.0; python_version < '3.11'"]
+
+[project.optional-dependencies]
+api = ["cryptography>=41"]
+dev = ["pytest>=7.4", "ruff>=0.4", "cryptography>=41"]
+
+[project.urls]
+Homepage = "https://github.com/saizul/content-decay-finder"
+Issues = "https://github.com/saizul/content-decay-finder/issues"
+Changelog = "https://github.com/saizul/content-decay-finder/blob/main/CHANGELOG.md"
+
+[project.scripts]
+content-decay-finder = "content_decay_finder.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "content_decay_finder._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+content_decay_finder = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src", "tests"]
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "RUF"]
+ignore = ["SIM108", "RUF022", "RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
