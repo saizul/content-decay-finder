@@ -12,6 +12,12 @@ def md_escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ").replace("`", "\\`")
 
 
+def _merged_note(merged_from: list[str]) -> str:
+    if not merged_from:
+        return ""
+    return "<br>incl. " + ", ".join(md_escape(u) for u in merged_from)
+
+
 def render_markdown(result: AnalysisResult) -> str:
     cfg = result.config
     site = result.site
@@ -40,7 +46,8 @@ def render_markdown(result: AnalysisResult) -> str:
         out.append("|---:|---|---|---:|---:|---:|---:|---:|---|")
         for i, p in enumerate(ranked, 1):
             out.append(
-                f"| {i} | {md_escape(p.page)} | {p.status} | {p.priority:.0f} | {num(p.lost_clicks)} | "
+                f"| {i} | {md_escape(p.page)}{_merged_note(p.merged_from)} | {p.status} | {p.priority:.0f} | "
+                f"{num(p.lost_clicks)} | "
                 f"{num(p.baseline_clicks, 1)} → {num(p.recent_clicks, 1)} | {pct(p.adjusted_change)} | "
                 f"{pos(p.baseline_position)} → {pos(p.recent_position)} ({delta_pos(p.position_change)}) | "
                 f"{', '.join(p.causes) or '-'} |"

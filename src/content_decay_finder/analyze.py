@@ -74,6 +74,7 @@ class AnalysisResult:
     notes: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
     has_queries: bool = False
+    redirects: dict[str, Any] | None = None  # rules, sources and merged URL counts when a redirect map was used
 
     @property
     def decaying(self) -> list[PageResult]:
@@ -99,6 +100,7 @@ class AnalysisResult:
                 "full_weeks": len(self.weeks),
                 "windows": self.windows,
                 "sources": self.sources,
+                "redirects": self.redirects,
             },
             "settings": {
                 "recent_weeks": self.config.recent_weeks,
@@ -128,8 +130,24 @@ def _filter(rows: list[Row], cfg: AnalysisConfig) -> list[Row]:
 def analyze(dataset: Dataset, cfg: AnalysisConfig | None = None) -> AnalysisResult:
     cfg = cfg or AnalysisConfig()
     cfg.validate()
-    page_rows = _filter(dataset.page_rows, cfg)
-    query_rows = _filter(dataset.query_rows, cfg)
+    page_rows, query_rows = dataset.page_rows, dataset.query_rows
+    merged: dict[str, set[str]] = {}
+    redirect_info: dict[str, Any] | None = None
+    rmap = cfg.redirect_map()
+    if rmap:
+        page_rows, merged = rmap.apply(page_rows)
+        query_rows, merged_q = rmap.apply(query_rows)
+        for target, olds in merged_q.items():
+            merged.setdefault(target, set()).update(olds)
+        redirect_info = {
+            "rules": len(rmap),
+            "sources": rmap.sources,
+            "skipped_rows": rmap.skipped,
+            "merged_urls": sum(len(v) for v in merged.values()),
+            "target_pages": len(merged),
+        }
+    page_rows = _filter(page_rows, cfg)
+    query_rows = _filter(query_rows, cfg)
     if not page_rows:
         raise AnalysisError("no rows to analyse")
     first = min(r.date for r in page_rows)
@@ -142,6 +160,12 @@ def analyze(dataset: Dataset, cfg: AnalysisConfig | None = None) -> AnalysisResu
             f"{cfg.recent_weeks + cfg.baseline_weeks} are needed (recent + baseline weeks)"
         )
     notes: list[str] = []
+    if merged:
+        n_old = sum(len(v) for v in merged.values())
+        notes.append(
+            f"Redirect map: {n_old} old URL(s) were merged into {len(merged)} page(s), so moved pages are judged on "
+            "their whole history."
+        )
     if dataset.page_level_derived:
         notes.append(
             "Page totals were summed from query rows; Search Console leaves out anonymised queries, so clicks and "
@@ -158,6 +182,8 @@ def analyze(dataset: Dataset, cfg: AnalysisConfig | None = None) -> AnalysisResu
         analyze_page(page, section_of(page, cfg.section_depth, cfg.section_rules), s, site, windows, cfg)
         for page, s in series.items()
     ]
+    for p in results:
+        p.merged_from = sorted(merged.get(p.page, ()))
     normalize_priorities(results)
     results.sort(key=lambda p: p.page)
 
@@ -213,6 +239,7 @@ def analyze(dataset: Dataset, cfg: AnalysisConfig | None = None) -> AnalysisResu
         notes=notes,
         sources=dataset.sources,
         has_queries=bool(query_rows),
+        redirects=redirect_info,
     )
 
 

@@ -91,9 +91,12 @@ def render_html(result: AnalysisResult) -> str:
             "<th>Causes</th></tr></thead><tbody>"
         )
         for i, p in enumerate(ranked, 1):
+            merged = ""
+            if p.merged_from:
+                merged = f"<br><span class='muted'>incl. redirected: {e(', '.join(p.merged_from))}</span>"
             parts.append(
                 f"<tr><td class='n'>{i}</td><td class='url'><a href=\"{e(p.page)}\" rel=\"noopener noreferrer\">"
-                f"{e(p.page)}</a><br><span class='muted'>{e(p.section)}</span></td>"
+                f"{e(p.page)}</a><br><span class='muted'>{e(p.section)}</span>{merged}</td>"
                 f"<td><span class='badge {e(p.status)}'>{e(p.status)}</span></td>"
                 f"<td class='n'>{p.priority:.0f}<div class='bar' style='width:{max(2, p.priority):.0f}%'></div></td>"
                 f"<td>{sparkline(p.weekly_clicks, label='clicks per week')}<br>"

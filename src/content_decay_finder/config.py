@@ -6,7 +6,10 @@ import re
 import sys
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover
+    from content_decay_finder.redirects import RedirectMap
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -55,6 +58,25 @@ class AnalysisConfig:
     top: int = 50
     strip_query_strings: bool = True
     ignore_patterns: list[re.Pattern[str]] = field(default_factory=list)
+    # redirect maps: old URL (or path) -> new URL (or path), from CSV files and/or inline pairs
+    redirect_files: list[Path] = field(default_factory=list)
+    redirect_pairs: list[tuple[str, str]] = field(default_factory=list)
+
+    def redirect_map(self) -> RedirectMap | None:
+        """The redirect map built from ``redirect_files`` and ``redirect_pairs`` (None when both are empty).
+
+        Raises :class:`~content_decay_finder.redirects.RedirectError` for unreadable files, conflicting rules or
+        redirect loops.
+        """
+        if not self.redirect_files and not self.redirect_pairs:
+            return None
+        from content_decay_finder.redirects import RedirectMap, load_redirects
+
+        rmap = RedirectMap(strip_query=self.strip_query_strings)
+        rmap.update(self.redirect_pairs)
+        if self.redirect_pairs:
+            rmap.sources.append("config")
+        return load_redirects(self.redirect_files, into=rmap)
 
     def validate(self) -> None:
         if min(self.recent_weeks, self.baseline_weeks, self.trend_weeks) < 1:
@@ -84,11 +106,30 @@ def parse_section_rule(text: str) -> SectionRule:
         raise ConfigError(f"bad regular expression in section rule {text!r}: {exc}") from exc
 
 
-_SIMPLE = {f.name for f in fields(AnalysisConfig)} - {"section_rules", "ignore_patterns", "seasonal_clamp"}
+_SIMPLE = {f.name for f in fields(AnalysisConfig)} - {
+    "section_rules",
+    "ignore_patterns",
+    "seasonal_clamp",
+    "redirect_files",
+    "redirect_pairs",
+}
 
 
-def apply_mapping(cfg: AnalysisConfig, data: dict[str, Any]) -> AnalysisConfig:
+def apply_mapping(cfg: AnalysisConfig, data: dict[str, Any], base_dir: Path | None = None) -> AnalysisConfig:
+    """Apply an ``[analysis]`` table. Relative ``redirects_file`` paths are resolved against ``base_dir``."""
     for key, value in data.items():
+        if key == "redirects":
+            if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
+                raise ConfigError("[analysis.redirects] must map old URLs or paths to new ones (strings)")
+            cfg.redirect_pairs += list(value.items())
+            continue
+        if key == "redirects_file":
+            values = [value] if isinstance(value, str) else value
+            if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
+                raise ConfigError("redirects_file must be a path or a list of paths")
+            for v in values:
+                cfg.redirect_files.append(base_dir / v if base_dir and not Path(v).is_absolute() else Path(v))
+            continue
         if key == "sections":
             if not isinstance(value, dict):
                 raise ConfigError("[analysis.sections] must map names to regular expressions")
@@ -129,6 +170,6 @@ def load_config_file(path: Path, cfg: AnalysisConfig | None = None) -> AnalysisC
     section = data.get("analysis", data)
     if not isinstance(section, dict):
         raise ConfigError("[analysis] must be a table")
-    apply_mapping(cfg, section)
+    apply_mapping(cfg, section, base_dir=path.parent)
     cfg.validate()
     return cfg
