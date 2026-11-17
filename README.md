@@ -44,6 +44,7 @@ year-over-year adjustment it is `stable`.
 - [Usage](#usage)
 - [How it works](#how-it-works)
 - [Configuration](#configuration)
+  - [Redirect maps](#redirect-maps)
 - [Reports](#reports)
 - [Library use](#library-use)
 - [Examples](#examples)
@@ -72,6 +73,9 @@ year-over-year adjustment it is `stable`.
 - **Cannibalisation**: queries where two or more pages share the impressions and the leading page keeps changing.
 - **Almost page 1**: pages (and page + query pairs) at positions 8 to 20 with enough impressions, with an estimate
   of the extra clicks at position 3 from the site's own CTR curve.
+- **Redirect maps**: merge the history of moved URLs into the page they redirect to (`--redirects`), so a
+  migrated page is judged on its whole history instead of showing up as a decaying old URL and a new one. Reads
+  `from,to` CSV files and crawler or redirect-plugin exports; chains are followed and loops rejected.
 - **Reports**: CSV (one file per table), JSON, Markdown and a self-contained HTML page with inline SVG sparklines
   (no scripts, no external resources). `--fail-on-decay N` for scheduled CI jobs.
 
@@ -158,6 +162,7 @@ analyze:
   --section-depth N          (1)    --section NAME=REGEX     --ignore REGEX
   --opp-min-position X       (8)    --opp-max-position X (20) --opp-min-impressions N (100)
   --keep-query-strings       treat /page?a=b as its own page   --top N (50 rows per table)
+  --redirects CSV            redirect map (old URL -> new URL); repeatable, see "Redirect maps"
 
 Search Console API (analyze and fetch):
   --site-url SITE            sc-domain:example.com or https://www.example.com/
@@ -186,6 +191,9 @@ content-decay-finder analyze gsc-data --ignore '^https://www\.example\.com/(tag|
 # Straight from the API, keeping a copy of the data
 content-decay-finder analyze --site-url sc-domain:example.com --credentials gsc.json \
   --filter 'page~/blog/' --save-csv gsc-data -f markdown
+
+# After a migration: count the old URLs' clicks for the pages they redirect to
+content-decay-finder analyze gsc-data --redirects redirects.csv -f html
 
 # A monthly CI job that fails when five or more pages are decaying
 content-decay-finder analyze gsc-data --fail-on-decay 5 -f markdown
@@ -292,6 +300,41 @@ ignore = ["/tag/", "/page/\\d+/"]
 "Services" = "^/services/"
 ```
 
+### Redirect maps
+
+When pages move, Search Console reports the old and the new URL separately: the old one looks like it is
+decaying (its clicks fall to zero) and the new one shows up as `new`. A redirect map fixes that by counting the
+rows of each old URL for its final target before the analysis.
+
+```csv
+from,to
+https://www.example.com/old-guide/,https://www.example.com/guides/widgets/
+/2023/05/best-widgets/,/best-widgets/
+```
+
+- Give the file with `--redirects redirects.csv` (repeatable), `redirects_file = "redirects.csv"` (a path or a
+  list, relative to the TOML file) or as an inline `[analysis.redirects]` table:
+
+  ```toml
+  [analysis.redirects]
+  "/old-guide/" = "/guides/widgets/"
+  ```
+
+- Entries are full `http(s)` URLs or paths starting with `/`. A path matches on any host, and a path target keeps
+  the host of the URL being redirected. URLs are normalised like the data (lower-cased scheme and host, no
+  fragment, no query string unless `--keep-query-strings`).
+- The header is optional. Besides `from`/`to`, the columns of common exports are recognised: `Source`/`Target`,
+  `Old URL`/`New URL`, `Address`/`Redirect URL` (Screaming Frog), `Source URL`/`Destination` and `Final Address`.
+  When a status column is present (`Status Code`, `Type`, ...), only rows with 301, 302, 303, 307 or 308 are used.
+  Comma, semicolon and tab separated files work; lines starting with `#` are comments.
+- Chains (`/a` -> `/b` -> `/c`) are followed to the end. Loops, chains longer than 20 hops and two different
+  targets for the same URL are errors (exit code 2), so a broken map never silently skews the report.
+- `ignore` patterns are matched against the URL after redirects.
+- Merged pages list their old URLs in `merged_from` (JSON and the pages CSV) and in the Markdown and HTML tables;
+  the JSON `data.redirects` object has the number of rules and merged URLs.
+
+### URL normalisation
+
 Query strings and fragments are removed from URLs by default (`/post/?utm_source=x` and `/post/` are one page),
 and scheme and host are lower-cased.
 
@@ -382,14 +425,17 @@ runs the suite on Python 3.10 to 3.13, plus a smoke test of the CLI on the sampl
   gained impressions for new, weaker queries. Check the `impressions` cause next to it.
 - The seasonal adjustment is a ratio of two windows, not a full seasonal decomposition; holidays that move
   between years (Easter, Eid, Black Friday) shift by up to a few weeks.
-- URL changes and redirects are not followed: a migrated page shows as a decaying old URL and a new URL.
+- URL changes and redirects are not detected automatically: without a [redirect map](#redirect-maps) a migrated
+  page shows as a decaying old URL and a new URL. The map is applied to the whole history, so give it only
+  permanent moves.
 - The generic CTR curve used where the site has little data is a rough approximation, and the "extra clicks" of
   the almost-page-1 list are an estimate, not a forecast.
 
 ## Contributing
 
 Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and
-guidelines, and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+guidelines, [SECURITY.md](SECURITY.md) for reporting vulnerabilities and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+for the code of conduct.
 
 ## License
 

@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Redirect maps: `--redirects FILE` (repeatable), `redirects_file` and `[analysis.redirects]` in the TOML config
+  merge the rows of moved URLs into the page they redirect to before the analysis, so a migrated page is no longer
+  reported as a decaying old URL plus a new one. Reads `from,to` CSV files and Screaming Frog, Redirection, Rank Math
+  and Yoast style exports (column aliases, status code filter, `,`/`;`/tab), follows chains and rejects loops,
+  conflicting targets and chains over 20 hops.
+- `merged_from` per page in the JSON and pages CSV reports and in the Markdown and HTML tables, a `data.redirects`
+  summary in the JSON report and a note in every report when URLs were merged.
+- `CODE_OF_CONDUCT.md`, issue templates (bug report, feature request) and a pull request template.
+
+### Changed
+
+- The pages CSV report has a new last column, `merged_from` (empty without a redirect map).
+
 ## [0.1.0] - 2026-11-14
 
 ### Added

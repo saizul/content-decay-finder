@@ -58,6 +58,7 @@ def write_csv_reports(result: AnalysisResult, out_dir: Path, basename: str) -> l
             _round(p.clicks_trend.relative_slope),
             _round(p.clicks_trend.r2, 3),
             ";".join(p.causes),
+            ";".join(p.merged_from),
         ]
         for p in sorted(result.pages, key=lambda p: (-p.priority_raw, -p.lost_clicks, p.page))
     ]
@@ -90,6 +91,7 @@ def write_csv_reports(result: AnalysisResult, out_dir: Path, basename: str) -> l
                 "clicks_trend_relative_slope",
                 "clicks_trend_r2",
                 "causes",
+                "merged_from",
             ],
             pages,
         ),

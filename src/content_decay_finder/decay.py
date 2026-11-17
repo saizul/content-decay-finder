@@ -46,6 +46,7 @@ class PageResult:
     weekly_clicks: list[float] = field(default_factory=list)
     weekly_impressions: list[float] = field(default_factory=list)
     weekly_position: list[float | None] = field(default_factory=list)
+    merged_from: list[str] = field(default_factory=list)  # old URLs folded into this page by a redirect map
 
     def to_dict(self) -> dict[str, object]:
         def r(value: float | None, digits: int = 4) -> float | None:
@@ -62,6 +63,7 @@ class PageResult:
             "lost_clicks": r(self.lost_clicks, 1),
             "steepness": r(self.steepness),
             "causes": self.causes,
+            "merged_from": self.merged_from,
             "clicks": {
                 "baseline_weekly": r(self.baseline_clicks, 2),
                 "recent_weekly": r(self.recent_clicks, 2),

@@ -15,8 +15,13 @@ opportunity_max_position = 20
 opportunity_min_impressions = 100
 top = 50
 ignore = ["/tag/", "/page/\\d+/", "\\?s="]
+# redirects_file = "redirects.csv"   # old URL -> new URL map (from,to), relative to this file
 
 [analysis.sections]
 # Named sections win over the path depth. Regular expressions are matched against the URL path.
 "Services" = "^/services/"
 "Free tools" = "^/tools/"
+
+# [analysis.redirects]
+# Moved pages: rows of the old URL (or path) are counted for the new one.
+# "/old-guide/" = "/guides/widgets/"

@@ -92,6 +92,14 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--section-depth", type=int, help="path segments per section (default 1)")
     t.add_argument("--section", action="append", default=[], metavar="NAME=REGEX", help="named section rule")
     t.add_argument("--ignore", action="append", default=[], metavar="REGEX", help="skip matching URLs")
+    t.add_argument(
+        "--redirects",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="CSV",
+        help="redirect map (from,to); old URLs are merged into their target (repeatable)",
+    )
     t.add_argument("--keep-query-strings", action="store_true", help="treat ?a=b URLs as separate pages")
     t.add_argument("--opp-min-position", type=float, dest="opportunity_min_position")
     t.add_argument("--opp-max-position", type=float, dest="opportunity_max_position")
@@ -134,6 +142,7 @@ def build_config(args: argparse.Namespace) -> AnalysisConfig:
         raise ConfigError(f"bad --ignore pattern: {exc}") from exc
     if args.keep_query_strings:
         cfg.strip_query_strings = False
+    cfg.redirect_files += args.redirects
     cfg.validate()
     return cfg
 

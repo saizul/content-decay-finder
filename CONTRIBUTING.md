@@ -68,6 +68,7 @@ src/content_decay_finder/
     seasonality.py      year-over-year factors
     decay.py            per-page status, causes and priority
     sections.py         section roll-up
+    redirects.py        redirect maps (old URL -> new URL) applied before the analysis
     cannibalization.py  queries moving between pages
     opportunities.py    almost page 1 and the CTR curve
     analyze.py          runs everything, AnalysisResult
@@ -85,3 +86,8 @@ examples/               sample data and generator, config, CI workflow, library 
 - Do not bump the version number; that happens at release time.
 
 By contributing you agree that your work is released under the MIT License.
+
+## Code of conduct
+
+Everyone taking part in this project is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Be
+respectful and constructive; harassment of any kind is not tolerated.
