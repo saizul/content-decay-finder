@@ -67,6 +67,8 @@ jobs:
           python examples/make_sample_data.py
           content-decay-finder analyze examples/sample-data --quiet -f json -o smoke2
           python -c "import json; a = json.load(open('smoke/content-decay.json'))['refresh_priorities']; b = json.load(open('smoke2/content-decay.json'))['refresh_priorities']; assert [p['page'] for p in a] == [p['page'] for p in b]"
+          # Two runs on the same data: nothing changed, so --fail-on-new 1 passes.
+          content-decay-finder compare smoke/content-decay.json smoke2/content-decay.json --fail-on-new 1
 
   docker:
     name: Docker build

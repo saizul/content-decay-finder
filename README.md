@@ -46,6 +46,7 @@ year-over-year adjustment it is `stable`.
 - [Configuration](#configuration)
   - [Redirect maps](#redirect-maps)
 - [Reports](#reports)
+  - [Comparing two runs](#comparing-two-runs)
 - [Library use](#library-use)
 - [Examples](#examples)
 - [Testing](#testing)
@@ -78,6 +79,8 @@ year-over-year adjustment it is `stable`.
   `from,to` CSV files and crawler or redirect-plugin exports; chains are followed and loops rejected.
 - **Reports**: CSV (one file per table), JSON, Markdown and a self-contained HTML page with inline SVG sparklines
   (no scripts, no external resources). `--fail-on-decay N` for scheduled CI jobs.
+- **Compare runs**: `compare OLD.json NEW.json` lists pages that are newly flagged, went from watch to decaying,
+  improved or recovered since the last report; `--fail-on-new N` fails a scheduled job only on new problems.
 
 ## Installation
 
@@ -147,6 +150,7 @@ totals are summed from it and the report says they are an underestimate.
 ```text
 content-decay-finder analyze [INPUT ...] [options]
 content-decay-finder fetch --site-url SITE [options]
+content-decay-finder compare OLD.json NEW.json [-f text|markdown|json] [-o FILE] [--fail-on-new N]
 
 analyze:
   INPUT                      CSV files or directories (or use --site-url to read from the API)
@@ -176,7 +180,7 @@ Search Console API (analyze and fetch):
   --no-queries               skip the date+page+query request (no cannibalisation)
 ```
 
-Exit codes: `0` success, `1` `--fail-on-decay` threshold reached, `2` usage, input or API error.
+Exit codes: `0` success, `1` `--fail-on-decay` or `--fail-on-new` threshold reached, `2` usage, input or API error.
 
 Examples:
 
@@ -347,9 +351,40 @@ and scheme and host are lower-cased.
 | `markdown` | `content-decay.md` | the tables, for a pull request, a ticket or a GitHub job summary |
 | `html` | `content-decay.html` | a single page with sparklines for clicks, impressions and position per page and section; light and dark mode |
 
-The JSON top-level keys are `data`, `settings`, `notes`, `site`, `refresh_priorities`, `sections`,
+The JSON top-level keys are `data`, `settings` (including `top`, the row limit per table), `notes`, `site`, `refresh_priorities`, `sections`,
 `cannibalization`, `almost_page_one`, `almost_page_one_queries` and `ctr_curve`. Text cells in the CSV files that
 start with `=`, `+`, `-` or `@` are prefixed with `'` so spreadsheets do not run them as formulas.
+
+### Comparing two runs
+
+Keep the JSON report of every scheduled run and compare the latest with the previous one to see what changed:
+
+```console
+$ content-decay-finder compare reports/2026-10.json reports/2026-11.json
+old: 2025-06-02 to 2026-10-04
+new: 2025-07-07 to 2026-11-08
+site clicks after seasonality: -5% -> -9%, lost clicks 867 -> 1,240
+pages: 2 new, 1 worse, 0 better, 1 resolved, 3 unchanged
+
+Newly flagged:
+  https://www.example.com/blog/pricing-guide/  (decaying, priority 88.0, lost 310 clicks)
+  ...
+```
+
+Pages are compared by their status in `refresh_priorities` (decaying and watch pages):
+
+| Change | Meaning |
+| ------ | ------- |
+| `new` | flagged now, not in the old report |
+| `worse` | went from `watch` to `decaying` |
+| `better` | went from `decaying` to `watch` |
+| `resolved` | in the old report, no longer flagged |
+| `unchanged` | same status in both (the priority change is shown) |
+
+`-f markdown` writes tables for a job summary or a ticket, `-f json` the full comparison. `--fail-on-new N` exits
+with `1` when `N` or more pages are `new` or `worse`, so a monthly job can fail only on new problems instead of on
+every page that is still decaying. A report lists at most `--top` flagged pages; when the new report's list is
+full, a page shown as resolved may only have ranked lower, and the output says so.
 
 ## Library use
 
