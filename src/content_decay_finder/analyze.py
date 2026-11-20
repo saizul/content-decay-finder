@@ -109,6 +109,7 @@ class AnalysisResult:
                 "decline_threshold": self.config.decline_threshold,
                 "seasonality": self.config.seasonality,
                 "section_depth": self.config.section_depth,
+                "top": limit,
             },
             "notes": self.notes,
             "site": self.site.to_dict(),

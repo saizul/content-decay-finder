@@ -11,6 +11,7 @@ from typing import TextIO
 
 from content_decay_finder._version import __version__
 from content_decay_finder.analyze import AnalysisError, AnalysisResult, analyze
+from content_decay_finder.compare import RENDERERS, CompareError, compare_reports, load_report
 from content_decay_finder.config import AnalysisConfig, ConfigError, load_config_file, parse_section_rule
 from content_decay_finder.gsc_api import ApiError, Signer, default_dates, make_client, parse_filter
 from content_decay_finder.http import Transport
@@ -110,7 +111,33 @@ def build_parser() -> argparse.ArgumentParser:
     f = sub.add_parser("fetch", help="download Search Analytics data to CSV (pages.csv and queries.csv)")
     f.add_argument("-o", "--output-dir", type=Path, default=Path("gsc-data"))
     _add_api_args(f)
+
+    c = sub.add_parser("compare", help="compare two JSON reports: newly decaying, worse, better and recovered pages")
+    c.add_argument("old", type=Path, help="earlier JSON report")
+    c.add_argument("new", type=Path, help="later JSON report")
+    c.add_argument("-f", "--format", choices=sorted(RENDERERS), default="text")
+    c.add_argument("-o", "--output", type=Path, help="write to this file instead of stdout")
+    c.add_argument(
+        "--fail-on-new",
+        type=int,
+        metavar="N",
+        help="exit with 1 when N or more pages are newly flagged or went from watch to decaying",
+    )
     return parser
+
+
+def run_compare(args: argparse.Namespace, out: TextIO) -> int:
+    cmp = compare_reports(load_report(args.old), load_report(args.new))
+    text = RENDERERS[args.format](cmp)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(text, encoding="utf-8")
+        out.write(f"wrote {args.output}\n")
+    else:
+        out.write(text)
+    if args.fail_on_new is not None and len(cmp.regressions) >= args.fail_on_new:
+        return EXIT_DECAY
+    return EXIT_OK
 
 
 def build_config(args: argparse.Namespace) -> AnalysisConfig:
@@ -208,6 +235,8 @@ def main(
     )
     stdout = out or sys.stdout
     try:
+        if args.command == "compare":
+            return run_compare(args, stdout)
         if args.command == "fetch":
             dataset = fetch_dataset(args, transport, signer, today)
             args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -241,6 +270,6 @@ def main(
         if args.fail_on_decay is not None and len(result.decaying) >= args.fail_on_decay:
             return EXIT_DECAY
         return EXIT_OK
-    except (ConfigError, LoadError, AnalysisError, ApiError, ValueError, OSError) as exc:
+    except (ConfigError, CompareError, LoadError, AnalysisError, ApiError, ValueError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR

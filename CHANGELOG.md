@@ -8,6 +8,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `compare OLD.json NEW.json` command: lists pages that are newly flagged, went from watch to decaying,
+  improved, recovered or stayed the same between two JSON reports, with site-level clicks and lost clicks side by
+  side. Text, Markdown and JSON output (`-f`, `-o`), and `--fail-on-new N` to fail scheduled jobs only on new
+  problems.
+- The JSON report's `settings` now include `top` (rows per table), so comparisons can tell a full list apart.
 - Redirect maps: `--redirects FILE` (repeatable), `redirects_file` and `[analysis.redirects]` in the TOML config
   merge the rows of moved URLs into the page they redirect to before the analysis, so a migrated page is no longer
   reported as a decaying old URL plus a new one. Reads `from,to` CSV files and Screaming Frog, Redirection, Rank Math
